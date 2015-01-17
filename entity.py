@@ -30,29 +30,12 @@ def cap(quantity, maximum, minimum=None, rollover=False):
 
 def caprot(rotation, maximum=360, minimum=0):
     return cap(rotation, maximum, minimum, True)
-    #if rotation > maximum:
-    #    return rotation - maximum
-    #elif rotation < 0:
-    #    return rotation + maximum
-
-    #return rotation
 
 def cappos(position, maximum=game.SCREEN_VECTOR):
     return pygame.math.Vector2(
         cap(position.x, game.SCREEN_WIDTH, 0, True),
         cap(position.y, game.SCREEN_HEIGHT, 0, True)
     )
-
-    #if position.x > maximum.x:
-    #    position.x -= maximum.x
-    #elif position.x < 0:
-    #    position.x += maximum.x
-    #if position.y > maximum.y:
-    #    position.y -= maximum.y
-    #elif position.y < 0:
-    #    position.y += maximum.y
-
-    #return position
 
 class Star:
     #COLORS = [WHITE, WHITE, LIGHTGREY, BLACK]
@@ -124,21 +107,8 @@ class Ship:
         self.rot += self.rotvel
         self.rot = caprot(self.rot)
 
-        ## scale the velocity
-        multiplier = 1.0
-        ## scale acceleration so that it's more effective in the direction we're
-        ## moving and less effective going against the direction we're moving
-        #rotation = UNIT_VECTOR.rotate(self.rot)
-        #multiplier = rotation.dot(self.vel)
-        #if multiplier != 0:
-        #    multiplier /= ( rotation.length() * self.vel.length() )
-
-        #multiplier = multiplier * 0.4 + 0.6 # between 0.2 and 1.0
-        #if multiplier > 0.8:
-        #    multiplier = 1.0
-
         # update velocity
-        self.vel += multiplier*self.accel * UNIT_VECTOR.rotate(self.rot)
+        self.vel += self.accel * UNIT_VECTOR.rotate(self.rot)
         if self.vel.length() != 0:
             self.vel = cap(self.vel.length(), self.MAX_VEL) * self.vel.normalize()
 
