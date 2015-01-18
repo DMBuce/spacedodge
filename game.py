@@ -40,6 +40,7 @@ def randpos():
 def randangle():
     return random.randint(0, 360)
 
+# prune dead objects
 def kill(i, objlist, children):
     objlist += children
     objlist.pop(i)
@@ -64,28 +65,33 @@ def main():
 
     #player.color = PINK
 
+    # add the player
     player = entity.PlayerShip()
     GAME_OBJECTS.append(player)
     PHYS_OBJECTS.append(player)
 
-    enemy = entity.EnemyShip(
-        randpos(),
-        #entity.UNIT_VECTOR.rotate(randangle()).scale_to_length(random.uniform(0.0, 0.5)),
-        0.5 * entity.EnemyShip.MAX_VEL*entity.UNIT_VECTOR.rotate(randangle()),
-        randangle()
-    )
-    enemy.target(player)
-    #enemy.player = player
-    GAME_OBJECTS.append(enemy)
-    PHYS_OBJECTS.append(enemy)
+    # add some enemies
+    for i in range(3):
+        enemy = entity.EnemyShip(
+            randpos(),
+            #entity.UNIT_VECTOR.rotate(randangle()).scale_to_length(random.uniform(0.0, 0.5)),
+            0.5 * entity.EnemyShip.MAX_VEL*entity.UNIT_VECTOR.rotate(randangle()),
+            randangle()
+        )
+        enemy.target(player)
+        #enemy.player = player
+        GAME_OBJECTS.append(enemy)
+        PHYS_OBJECTS.append(enemy)
 
-    asteroid = entity.Asteroid(
-        randpos(),
-        random.uniform(0.01, 0.75*entity.PlayerShip.MAX_VEL) \
-            * entity.UNIT_VECTOR.rotate(randangle())
-    )
-    GAME_OBJECTS.append(asteroid)
-    PHYS_OBJECTS.append(asteroid)
+    # add some asteroids
+    for i in range(10):
+        asteroid = entity.Asteroid(
+            randpos(),
+            random.uniform(0.01, 0.75*entity.PlayerShip.MAX_VEL) \
+                * entity.UNIT_VECTOR.rotate(randangle())
+        )
+        GAME_OBJECTS.append(asteroid)
+        PHYS_OBJECTS.append(asteroid)
 
     for i in range(SCREEN_WIDTH * SCREEN_HEIGHT // 700):
         GAME_OBJECTS.append(entity.Star())

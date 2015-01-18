@@ -128,6 +128,9 @@ class Asteroid(Entity):
         self.pos = cappos(self.pos)
 
     def interact(self, other, recurse=True):
+        if isinstance(other, Asteroid):
+            return
+
         self.destroy()
         if recurse:
             other.interact(self, False)
