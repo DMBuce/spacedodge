@@ -25,8 +25,18 @@ SCREEN_HEIGHT = 720
 SCREEN_VECTOR = pygame.math.Vector2(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 GAME_OBJECTS = []
+PHYS_OBJECTS = []
 
 (x, y) = (0, 1)
+
+def randpos():
+    return (
+        random.randint(0, SCREEN_WIDTH),
+        random.randint(0, SCREEN_HEIGHT)
+    )
+
+def randangle():
+    return random.randint(0, 360)
 
 def main():
     random.seed()
@@ -43,12 +53,30 @@ def main():
 
     clock = pygame.time.Clock()
 
-    ship = entity.Ship()
-    ship.color = PINK
+    #player.color = PINK
 
-    GAME_OBJECTS.append(ship)
+    player = entity.PlayerShip()
+    GAME_OBJECTS.append(player)
+    PHYS_OBJECTS.append(player)
 
-    enemies = []
+    enemy = entity.EnemyShip(
+        randpos(),
+        #entity.UNIT_VECTOR.rotate(randangle()).scale_to_length(random.uniform(0.0, 0.5)),
+        0.5 * entity.EnemyShip.MAX_VEL*entity.UNIT_VECTOR.rotate(randangle()),
+        randangle()
+    )
+    enemy.target(player)
+    #enemy.player = player
+    GAME_OBJECTS.append(enemy)
+    PHYS_OBJECTS.append(enemy)
+
+    asteroid = entity.Asteroid(
+        randpos(),
+        random.uniform(0.01, 0.75*entity.PlayerShip.MAX_VEL) \
+            * entity.UNIT_VECTOR.rotate(randangle())
+    )
+    GAME_OBJECTS.append(asteroid)
+    PHYS_OBJECTS.append(asteroid)
 
     for i in range(SCREEN_WIDTH * SCREEN_HEIGHT // 700):
         GAME_OBJECTS.append(entity.Star())
@@ -59,12 +87,19 @@ def main():
             if event.type == pygame.QUIT:
                 done = True
             elif event.type == pygame.KEYDOWN or event.type == pygame.KEYUP:
-                ship.handle(event)
+                player.handle(event)
 
         # GAME LOGIC
 
+        # update each game object
         for thing in GAME_OBJECTS:
             thing.update()
+
+        # check for collisions
+        for i, thing in enumerate(PHYS_OBJECTS):
+            for that in PHYS_OBJECTS[i+1:]:
+                if thing.touches(that):
+                    thing.interact(that)
 
         # DRAW SCREEN
 

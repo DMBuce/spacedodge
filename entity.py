@@ -9,9 +9,7 @@ from game import GREY
 from game import DARKGREY
 from game import BLACK
 from game import YELLOW
-
-#from game import game.SCREEN_WIDTH
-#from game import game.SCREEN_HEIGHT
+from game import PINK
 
 UNIT_VECTOR = pygame.math.Vector2(0, -1)
 
@@ -37,16 +35,41 @@ def cappos(position, maximum=game.SCREEN_VECTOR):
         cap(position.y, game.SCREEN_HEIGHT, 0, True)
     )
 
-class Star:
+class Entity:
+    """Interface for all Space Dodge game objects."""
+
+    def update(self):
+        raise NotImplementedError(
+            "Class %s doesn't implement update()" % self.__class__.__name__
+        )
+
+    def draw(self, screen):
+        raise NotImplementedError(
+            "Class %s doesn't implement draw()" % self.__class__.__name__
+        )
+
+    def touches(self, other):
+        if self.rect is not None and other.rect is not None:
+            return pygame.sprite.collide_rect(self, other)
+        else:
+            return False
+
+        #raise NotImplementedError(
+        #    "Class %s doesn't implement touches()" % self.__class__.__name__
+        #)
+
+    def interact(self, other):
+        raise NotImplementedError(
+            "Class %s doesn't implement interact()" % self.__class__.__name__
+        )
+
+class Star(Entity):
     #COLORS = [WHITE, WHITE, LIGHTGREY, BLACK]
     COLORS = [WHITE, LIGHTGREY, GREY, DARKGREY, BLACK, WHITE]
     MAX_COUNT = 3000
 
     def __init__(self):
-        self.pos = (
-            random.randint(0, game.SCREEN_WIDTH),
-            random.randint(0, game.SCREEN_HEIGHT)
-        )
+        self.pos = game.randpos()
         self.index = random.randint(0, len(self.COLORS) - 1)
         self.color = self.COLORS[self.index]
         self.count = random.randint(0, self.MAX_COUNT)
@@ -64,8 +87,55 @@ class Star:
             self.index = cap(self.index, 1)
             self.color = self.COLORS[self.index]
 
-class Ship:
+class Asteroid(Entity):
+    VEL = 0.85
 
+    def __init__(self, pos, vel):
+        self.pos = pygame.math.Vector2(pos)
+        self.vel = pygame.math.Vector2(vel)
+        #self.vel.scale_to_length(self.VEL)
+        self.color = WHITE
+        self.radius = random.randint(2, 30)
+        self.corners = self._mkcorners()
+        self.rect = None #pygame.Rect(pos, (2*self.radius, 2*self.radius) )
+
+    def _mkcorners(self):
+        num = random.randint(6, 9)
+        retval = []
+        for i in range(num):
+            corner = UNIT_VECTOR.rotate(i * 360.0 / num)
+            corner.scale_to_length(self.radius + random.randint(-2, 3))
+            retval.append(corner)
+
+        return retval
+
+    def points(self):
+        retval = []
+        for p in self.corners:
+            retval.append(self.pos + p)
+
+        return retval
+
+    def draw(self, screen):
+        self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
+
+    def update(self):
+        # debugging
+        #print( "{} {}".format(self.rot, self.rotvel) )
+
+        # update position
+        self.pos += self.vel
+
+        # wrap screen
+        self.pos = cappos(self.pos)
+
+    def interact(self, other, recurse=True):
+        #self.destroy()
+        self.color = PINK
+        if recurse:
+            other.interact(self, False)
+
+class Ship(Entity):
     WIDTH  = 5
     HEIGHT = 7
     MAX_VEL = 1.75
@@ -73,13 +143,23 @@ class Ship:
     MAX_ACCEL = 0.08
     MAX_ROTVEL = 2.0
 
-    def __init__(self, pos=(game.SCREEN_WIDTH / 2.0, game.SCREEN_HEIGHT / 2.0) ):
+    def __init__(self, pos, vel, rot):
         self.pos = pygame.math.Vector2(pos)
-        self.vel = pygame.math.Vector2(0.0, 0.0)
+        self.vel = pygame.math.Vector2(vel)
+        self.rot = rot
         self.accel = 0.0
-        self.rot = 0.0
         self.rotvel = 0.0
         self.color = YELLOW
+        #self.__init_sprites__()
+        self.rect = None #pygame.Rect(pos, (
+
+    #def __init_sprites__(self):
+    #    self.sprites = pygame.sprite.Group()
+
+    #    butt = pygame.sprite.Sprite()
+    #    butt.image = pygame.Surface([self.WIDTH, 0])
+    #    butt.rect = butt.image.get_rect()
+    #    self.sprites.add(butt)
 
     def points(self):
         return [
@@ -97,7 +177,15 @@ class Ship:
         ]
 
     def draw(self, screen):
-        pygame.draw.polygon(screen, self.color, self.points(), 1)
+        self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
+
+    def accelerate(self, accel):
+        self.accel += accel
+        self.accel = cap(self.accel, self.MAX_ACCEL)
+
+    def rotate(self, rotvel):
+        self.rotvel += rotvel
+        self.rotvel = cap(self.rotvel, self.MAX_ROTVEL)
 
     def update(self):
         # debugging
@@ -121,13 +209,83 @@ class Ship:
         # wrap screen
         self.pos = cappos(self.pos)
 
-    def accelerate(self, accel):
-        self.accel += accel
-        self.accel = cap(self.accel, self.MAX_ACCEL)
+    def interact(self, other, recurse=True):
+        #self.destroy()
+        self.color = WHITE
+        if recurse:
+            other.interact(self, False)
 
-    def rotate(self, rotvel):
-        self.rotvel += rotvel
-        self.rotvel = cap(self.rotvel, self.MAX_ROTVEL)
+class StationaryTarget:
+    def __init__(self, pos):
+        self.pos = pos
+
+class EnemyShip(Ship):
+
+    def __init__(self, pos, vel, rot):
+        super(EnemyShip, self).__init__(pos, vel, rot)
+        self.count = 120 # 2 seconds
+        self.update = self.cooldown
+        self.goal = StationaryTarget(
+            (game.SCREEN_WIDTH / 2.0, game.SCREEN_HEIGHT / 2.0)
+        )
+
+    def cooldown(self):
+        if self.count > 0:
+            self.count -= 1
+        else:
+            self.accel = self.MAX_ACCEL
+            self.update = self.seek
+
+        super(EnemyShip, self).update()
+
+    def target(self, goal):
+        self.goal = goal
+
+    def seek(self):
+        targetheading = self.goal.pos - self.pos
+        #currentheading = UNIT_VECTOR.rotate(self.rot)
+        currentheading = self.vel
+
+        crossproduct = currentheading.cross(targetheading)
+        angle = currentheading.angle_to(targetheading)
+        #if -self.MAX_ROTVEL <= angle <= self.MAX_ROTVEL:
+        #    self.rotvel = angle
+        if crossproduct >= 0:
+            self.rotvel = self.MAX_ROTVEL
+        elif crossproduct <= 0:
+            self.rotvel = -self.MAX_ROTVEL
+        else:
+            self.rotvel = 0.0
+
+        #angle = currentheading.angle_to(targetheading)
+
+        #if angle > self.MAX_ROTVEL:
+        #    self.rotvel = self.MAX_ROTVEL
+        #elif angle < -self.MAX_ROTVEL:
+        #    self.rotvel = -self.MAX_ROTVEL
+        #else: # -self.MAX_ROTVEL <= angle <= self.MAX_ROTVEL
+        #    self.rotvel = 2*angle
+
+        super(EnemyShip, self).update()
+
+    #def update(self):
+    #    if self.cooldown > 0:
+    #        pass
+    #    else:
+    #        #self.accelerate(self.MAX_ACCEL)
+    #        self.accel = self.MAX_ACCEL
+
+    #    super(EnemyShip, self).update()
+
+class PlayerShip(Ship):
+
+    def __init__(self,
+        pos=(game.SCREEN_WIDTH / 2.0, game.SCREEN_HEIGHT / 2.0),
+        vel=(0.0, 0.0),
+        rot=0.0
+    ):
+        super(PlayerShip, self).__init__(pos, vel, rot)
+        self.color = PINK
 
     def handle(self, event):
         if event.type == pygame.KEYDOWN:
