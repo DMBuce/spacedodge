@@ -24,6 +24,8 @@ SCREEN_HEIGHT = 720
 #SCREEN_HEIGHT = 500
 SCREEN_VECTOR = pygame.math.Vector2(SCREEN_WIDTH, SCREEN_HEIGHT)
 
+global GAME_OBJECTS
+global PHYS_OBJECTS
 GAME_OBJECTS = []
 PHYS_OBJECTS = []
 
@@ -37,6 +39,10 @@ def randpos():
 
 def randangle():
     return random.randint(0, 360)
+
+def kill(i, objlist, children):
+    objlist += children
+    objlist.pop(i)
 
 def main():
     random.seed()
@@ -92,13 +98,20 @@ def main():
         # GAME LOGIC
 
         # update each game object
-        for thing in GAME_OBJECTS:
-            thing.update()
+        for i, thing in enumerate(GAME_OBJECTS):
+            if thing.isdead:
+                kill(i, GAME_OBJECTS, thing.gamechildren + thing.physchildren)
+            else:
+                thing.update()
 
         # check for collisions
         for i, thing in enumerate(PHYS_OBJECTS):
-            for that in PHYS_OBJECTS[i+1:]:
-                if thing.touches(that):
+            if thing.isdead:
+                kill(i, PHYS_OBJECTS, thing.physchildren)
+            for j, that in enumerate(PHYS_OBJECTS[i+1:]):
+                if that.isdead:
+                    kill(i+j+1, PHYS_OBJECTS, thing.physchildren)
+                elif thing.touches(that):
                     thing.interact(that)
 
         # DRAW SCREEN

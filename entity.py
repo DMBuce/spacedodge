@@ -38,6 +38,10 @@ def cappos(position, maximum=game.SCREEN_VECTOR):
 class Entity:
     """Interface for all Space Dodge game objects."""
 
+    isdead = False
+    gamechildren = []
+    physchildren = []
+
     def update(self):
         raise NotImplementedError(
             "Class %s doesn't implement update()" % self.__class__.__name__
@@ -120,13 +124,12 @@ class Asteroid(Entity):
         self.pos = cappos(self.pos)
 
     def interact(self, other, recurse=True):
-        #self.destroy()
-        if other.color != self.lastcolor and other.lastcolor != self.color:
-            (self.lastcolor, other.lastcolor) = (self.color, other.color)
-            (self.color, other.color) = (other.color, self.color)
-
+        self.destroy()
         if recurse:
             other.interact(self, False)
+
+    def destroy(self):
+        return NotImplementedError()
 
 class Ship(Entity):
     WIDTH  = 5
@@ -192,13 +195,54 @@ class Ship(Entity):
         self.pos = cappos(self.pos)
 
     def interact(self, other, recurse=True):
-        #self.destroy()
-        if other.color != self.lastcolor and other.lastcolor != self.color:
-            (self.lastcolor, other.lastcolor) = (self.color, other.color)
-            (self.color, other.color) = (other.color, self.color)
-
+        self.destroy()
         if recurse:
             other.interact(self, False)
+
+    def destroy(self):
+        self.isdead = True
+        self.gamechildren = Debris.scrap(self)
+
+class Debris(Entity):
+    ROTVEL = 5
+
+    def __init__(self, ship, i, vel):
+        segments = ship.points()
+        segments.pop(i)
+        self.pos = ( segments[0] + segments[1] ) / 2.0
+        self.ends = [ segment - self.pos for segment in segments ]
+        self.vel = vel
+        self.rotvel = self.ROTVEL
+        self.color = ship.color
+
+        #print("%s %s %s" % (self.pos, ship.pos, self.points()) )
+
+    # factory method for making a list of debris from a ship
+    def scrap(ship):
+        retval = []
+        for i in range(3):
+            vel = pygame.math.Vector2(ship.vel)
+            vel += 0.3*vel.length() * UNIT_VECTOR.rotate(game.randangle())
+            retval.append( Debris(ship, i, vel) )
+
+        return retval
+
+    def update(self):
+        # update rotation
+        self.ends = [ end.rotate(self.rotvel) for end in self.ends ]
+
+        # update position
+        self.pos += self.vel
+
+        # wrap screen
+        if self.pos != cappos(self.pos):
+            self.isdead = True
+
+    def points(self):
+        return [ self.pos + end for end in self.ends ]
+
+    def draw(self, screen):
+        self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
 
 class StationaryTarget:
     def __init__(self, pos):
