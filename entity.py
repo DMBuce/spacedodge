@@ -54,17 +54,12 @@ class Entity:
         else:
             return False
 
-        #raise NotImplementedError(
-        #    "Class %s doesn't implement touches()" % self.__class__.__name__
-        #)
-
     def interact(self, other):
         raise NotImplementedError(
             "Class %s doesn't implement interact()" % self.__class__.__name__
         )
 
 class Star(Entity):
-    #COLORS = [WHITE, WHITE, LIGHTGREY, BLACK]
     COLORS = [WHITE, LIGHTGREY, GREY, DARKGREY, BLACK, WHITE]
     MAX_COUNT = 3000
 
@@ -88,16 +83,14 @@ class Star(Entity):
             self.color = self.COLORS[self.index]
 
 class Asteroid(Entity):
-    VEL = 0.85
-
     def __init__(self, pos, vel):
         self.pos = pygame.math.Vector2(pos)
         self.vel = pygame.math.Vector2(vel)
-        #self.vel.scale_to_length(self.VEL)
         self.color = WHITE
         self.radius = random.randint(2, 30)
         self.corners = self._mkcorners()
-        self.rect = None #pygame.Rect(pos, (2*self.radius, 2*self.radius) )
+        self.rect = None
+        self.lastcolor = self.color
 
     def _mkcorners(self):
         num = random.randint(6, 9)
@@ -120,9 +113,6 @@ class Asteroid(Entity):
         self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
 
     def update(self):
-        # debugging
-        #print( "{} {}".format(self.rot, self.rotvel) )
-
         # update position
         self.pos += self.vel
 
@@ -131,7 +121,10 @@ class Asteroid(Entity):
 
     def interact(self, other, recurse=True):
         #self.destroy()
-        self.color = PINK
+        if other.color != self.lastcolor and other.lastcolor != self.color:
+            (self.lastcolor, other.lastcolor) = (self.color, other.color)
+            (self.color, other.color) = (other.color, self.color)
+
         if recurse:
             other.interact(self, False)
 
@@ -150,16 +143,8 @@ class Ship(Entity):
         self.accel = 0.0
         self.rotvel = 0.0
         self.color = YELLOW
-        #self.__init_sprites__()
-        self.rect = None #pygame.Rect(pos, (
-
-    #def __init_sprites__(self):
-    #    self.sprites = pygame.sprite.Group()
-
-    #    butt = pygame.sprite.Sprite()
-    #    butt.image = pygame.Surface([self.WIDTH, 0])
-    #    butt.rect = butt.image.get_rect()
-    #    self.sprites.add(butt)
+        self.rect = None
+        self.lastcolor = self.color
 
     def points(self):
         return [
@@ -188,9 +173,6 @@ class Ship(Entity):
         self.rotvel = cap(self.rotvel, self.MAX_ROTVEL)
 
     def update(self):
-        # debugging
-        #print( "{} {}".format(self.rot, self.rotvel) )
-
         # update rotation
         self.rot += self.rotvel
         self.rot = caprot(self.rot)
@@ -211,7 +193,10 @@ class Ship(Entity):
 
     def interact(self, other, recurse=True):
         #self.destroy()
-        self.color = WHITE
+        if other.color != self.lastcolor and other.lastcolor != self.color:
+            (self.lastcolor, other.lastcolor) = (self.color, other.color)
+            (self.color, other.color) = (other.color, self.color)
+
         if recurse:
             other.interact(self, False)
 
@@ -243,13 +228,10 @@ class EnemyShip(Ship):
 
     def seek(self):
         targetheading = self.goal.pos - self.pos
-        #currentheading = UNIT_VECTOR.rotate(self.rot)
         currentheading = self.vel
 
         crossproduct = currentheading.cross(targetheading)
         angle = currentheading.angle_to(targetheading)
-        #if -self.MAX_ROTVEL <= angle <= self.MAX_ROTVEL:
-        #    self.rotvel = angle
         if crossproduct >= 0:
             self.rotvel = self.MAX_ROTVEL
         elif crossproduct <= 0:
@@ -257,25 +239,7 @@ class EnemyShip(Ship):
         else:
             self.rotvel = 0.0
 
-        #angle = currentheading.angle_to(targetheading)
-
-        #if angle > self.MAX_ROTVEL:
-        #    self.rotvel = self.MAX_ROTVEL
-        #elif angle < -self.MAX_ROTVEL:
-        #    self.rotvel = -self.MAX_ROTVEL
-        #else: # -self.MAX_ROTVEL <= angle <= self.MAX_ROTVEL
-        #    self.rotvel = 2*angle
-
         super(EnemyShip, self).update()
-
-    #def update(self):
-    #    if self.cooldown > 0:
-    #        pass
-    #    else:
-    #        #self.accelerate(self.MAX_ACCEL)
-    #        self.accel = self.MAX_ACCEL
-
-    #    super(EnemyShip, self).update()
 
 class PlayerShip(Ship):
 
