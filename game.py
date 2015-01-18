@@ -45,6 +45,9 @@ def kill(i, objlist, children):
     objlist.pop(i)
 
 def main():
+#    global GAME_OBJECTS
+#    global PHYS_OBJECTS
+
     random.seed()
 
     pygame.display.init()

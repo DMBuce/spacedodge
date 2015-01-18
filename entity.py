@@ -67,8 +67,12 @@ class Star(Entity):
     COLORS = [WHITE, LIGHTGREY, GREY, DARKGREY, BLACK, WHITE]
     MAX_COUNT = 3000
 
-    def __init__(self):
-        self.pos = game.randpos()
+    def __init__(self, pos=None):
+        if pos is None:
+            self.pos = pygame.math.Vector2(game.randpos())
+        else:
+            self.pos = pygame.math.Vector2(pos)
+
         self.index = random.randint(0, len(self.COLORS) - 1)
         self.color = self.COLORS[self.index]
         self.count = random.randint(0, self.MAX_COUNT)
@@ -129,7 +133,12 @@ class Asteroid(Entity):
             other.interact(self, False)
 
     def destroy(self):
-        return NotImplementedError()
+        self.isdead = True
+        self.gamechildren = Debris.scrap(self)
+        if self.radius >= 4:
+            self.physchildren = [
+
+            ]
 
 class Ship(Entity):
     WIDTH  = 5
@@ -204,26 +213,34 @@ class Ship(Entity):
         self.gamechildren = Debris.scrap(self)
 
 class Debris(Entity):
-    ROTVEL = 5
+    BASE_ROTVEL = 5
 
     def __init__(self, ship, i, vel):
         segments = ship.points()
-        segments.pop(i)
+        j = i+1
+        if len(segments) == j:
+            j = 0
+
+        segments = [ segments[i], segments[j] ]
         self.pos = ( segments[0] + segments[1] ) / 2.0
         self.ends = [ segment - self.pos for segment in segments ]
         self.vel = vel
-        self.rotvel = self.ROTVEL
+        self.rotvel = self.BASE_ROTVEL + random.randint(-2, 2)
         self.color = ship.color
 
         #print("%s %s %s" % (self.pos, ship.pos, self.points()) )
 
-    # factory method for making a list of debris from a ship
-    def scrap(ship):
+    # factory method for making a pile of debris from an object
+    def scrap(entity):
         retval = []
-        for i in range(3):
-            vel = pygame.math.Vector2(ship.vel)
+        for i in range(len(entity.points())):
+            vel = pygame.math.Vector2(entity.vel)
             vel += 0.3*vel.length() * UNIT_VECTOR.rotate(game.randangle())
-            retval.append( Debris(ship, i, vel) )
+            retval.append( Debris(entity, i, vel) )
+
+        # drop no more than 3 pieces of debris
+        while len(retval) > 3:
+            retval.pop( random.randint(0, len(retval) - 1) )
 
         return retval
 
@@ -244,19 +261,13 @@ class Debris(Entity):
     def draw(self, screen):
         self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
 
-class StationaryTarget:
-    def __init__(self, pos):
-        self.pos = pos
-
 class EnemyShip(Ship):
 
     def __init__(self, pos, vel, rot):
         super(EnemyShip, self).__init__(pos, vel, rot)
         self.count = 120 # 2 seconds
         self.update = self.cooldown
-        self.goal = StationaryTarget(
-            (game.SCREEN_WIDTH / 2.0, game.SCREEN_HEIGHT / 2.0)
-        )
+        self.goal = self
 
     def cooldown(self):
         if self.count > 0:
@@ -294,6 +305,10 @@ class PlayerShip(Ship):
     ):
         super(PlayerShip, self).__init__(pos, vel, rot)
         self.color = PINK
+
+    def destroy(self):
+        super().destroy()
+        self.pos = pygame.math.Vector2(game.SCREEN_WIDTH / 2.0, game.SCREEN_HEIGHT / 2.0)
 
     def handle(self, event):
         if event.type == pygame.KEYDOWN:
