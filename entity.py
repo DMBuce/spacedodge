@@ -65,13 +65,18 @@ class Entity:
 
 class Star(Entity):
     COLORS = [WHITE, LIGHTGREY, GREY, DARKGREY, BLACK, WHITE]
-    MAX_COUNT = 3000
+    MAX_COUNT = 3000 # max length of time before a star changes colors: 50s
 
-    def __init__(self, pos=None):
+    def __init__(self, pos=None, player=None):
         if pos is None:
             self.pos = pygame.math.Vector2(game.randpos())
         else:
             self.pos = pygame.math.Vector2(pos)
+
+        if player is None:
+            self.goal = self
+        else:
+            self.goal = player
 
         self.index = random.randint(0, len(self.COLORS) - 1)
         self.color = self.COLORS[self.index]
@@ -87,15 +92,108 @@ class Star(Entity):
             self.count = random.randint(0, self.MAX_COUNT)
 
             self.index += random.randint(-1, 1)
-            self.index = cap(self.index, 1)
-            self.color = self.COLORS[self.index]
+            self.index = cap(self.index, len(self.COLORS)-1)
+            if self.color != self.COLORS[self.index]:
+                self.color = self.COLORS[self.index]
+                if self.index == len(self.COLORS) - 1:
+                    self.gamechildren = [ SpaceHole(self) ]
+
+class SpaceHole(Entity):
+    MAX_RADIUS = 30
+    #MAX_RAYLENGTH = 3
+    TRANSITIONS = [ 1.0/3.0, 2.0/3.0, 5.0/6.0 ]
+    NUMRAYS = 8
+    RADVEL = 1.0 / 3.0
+    ROTACC = 0.5
+    makeboth = True
+
+    def __init__(self, star):
+        self.pos = star.pos
+        self.goal = star.goal
+        self.child = self._birth()
+        self.radius = 0.0
+        self.raylength = 0
+        self.rot = 0
+        self.rotvel = 5
+        self.color = WHITE
+        print("SpaceHole at %s incoming!" % self.pos)
+
+    def _birth(self):
+        enemychance = 0.1 # asteroidchance = 1.0 - enemychance
+        diceroll = random.uniform(0.0, 1.0)
+        if diceroll < enemychance:
+            enemy = EnemyShip(
+                self.pos,
+                0.5 * EnemyShip.MAX_VEL*UNIT_VECTOR.rotate(game.randangle()),
+                game.randangle()
+            )
+            enemy.target(self.goal)
+            return enemy
+        elif self.makeboth:
+            return Asteroid(
+                self.pos,
+                random.uniform(0.01, 0.5*PlayerShip.MAX_VEL) \
+                    * UNIT_VECTOR.rotate(game.randangle())
+            )
+        else:
+            self.isdead = True
+
+    def _raylonger(self):
+        for t in self.TRANSITIONS:
+            r = t * self.MAX_RADIUS
+            if r < self.radius <= r + self.RADVEL:
+                return True
+
+        return False
+
+        #if self.MAX_RADIUS * 2.0/3 + self.RADVEL > self.radius >= self.MAX_RADIUS * 2.0/3:
+        #elif self.MAX_RADIUS * 5.0/6 + self.RADVEL > self.radius >= self.MAX_RADIUS * 5.0/6:
+
+    def update(self):
+        self.radius += self.RADVEL
+        if self._raylonger():
+            self.raylength += 1
+
+        #if self.MAX_RADIUS * 2.0/3 + self.RADVEL > self.radius >= self.MAX_RADIUS * 2.0/3:
+        ##if self.radius % 3 == 0 and self.raylength < self.MAX_RAYLENGTH:
+        #    self.raylength += 1
+        #elif self.MAX_RADIUS * 5.0/6 + self.RADVEL > self.radius >= self.MAX_RADIUS * 5.0/6:
+        #    self.raylength += 1
+
+        self.rotvel += self.ROTACC
+        self.rot += self.rotvel
+
+        if self.radius >= self.MAX_RADIUS:
+            self.isdead = True
+            self.physchildren = [ self.child ]
+
+    def lines(self):
+        retval = []
+        for i in range(self.NUMRAYS):
+            angle = UNIT_VECTOR.rotate(i * 360 / self.NUMRAYS + self.rot)
+            ray = (
+                self.pos + (self.radius) * angle,
+                self.pos + (self.radius + self.raylength) * angle
+            )
+            retval.append( ray )
+
+        return retval
+
+    def draw(self, screen):
+        for points in self.lines():
+            #self.rect =
+            pygame.draw.polygon(screen, self.color, points, 1)
 
 class Asteroid(Entity):
-    def __init__(self, pos, vel):
+    def __init__(self, pos, vel, radius=None):
         self.pos = pygame.math.Vector2(pos)
         self.vel = pygame.math.Vector2(vel)
         self.color = WHITE
-        self.radius = random.randint(2, 30)
+        if radius == None:
+            self.radius = random.randint(2, 30)
+        else:
+            self.radius = radius
+
         self.corners = self._mkcorners()
         self.rect = None
         self.lastcolor = self.color
@@ -139,9 +237,13 @@ class Asteroid(Entity):
         self.isdead = True
         self.gamechildren = Debris.scrap(self)
         if self.radius >= 4:
-            self.physchildren = [
+            for i in range(2):
+                self.physchildren = [ self._birth() for i in range(2) ]
 
-            ]
+    def _birth(self):
+        v = pygame.math.Vector2(self.vel)
+        v += 0.1*v.length() * UNIT_VECTOR.rotate(game.randangle())
+        return Asteroid(self.pos, v, self.radius // 2)
 
 class Ship(Entity):
     WIDTH  = 5
@@ -217,6 +319,7 @@ class Ship(Entity):
 
 class Debris(Entity):
     BASE_ROTVEL = 5
+    MIN_VEL = 0.5
 
     def __init__(self, ship, i, vel):
         segments = ship.points()
@@ -228,6 +331,11 @@ class Debris(Entity):
         self.pos = ( segments[0] + segments[1] ) / 2.0
         self.ends = [ segment - self.pos for segment in segments ]
         self.vel = vel
+        if self.vel.length() == 0:
+            self.vel = self.MIN_VEL * UNIT_VECTOR.rotate(game.randangle())
+        elif self.vel.length() < self.MIN_VEL:
+            self.vel.scale_to_length(self.MIN_VEL)
+
         self.rotvel = self.BASE_ROTVEL + random.randint(-2, 2)
         self.color = ship.color
 
