@@ -3,13 +3,15 @@ import pygame
 import random
 
 import game
-from game import WHITE
-from game import LIGHTGREY
-from game import GREY
-from game import DARKGREY
-from game import BLACK
-from game import YELLOW
-from game import PINK
+
+# colors
+BLACK     = (  0,   0,   0)
+DARKGREY  = (191, 191, 191)
+GREY      = (127, 127, 127)
+LIGHTGREY = ( 63,  63,  63)
+WHITE     = (255, 255, 255)
+PINK      = (255,  20, 147)
+YELLOW    = (255, 255,   0)
 
 UNIT_VECTOR = pygame.math.Vector2(0, -1)
 
@@ -29,18 +31,21 @@ def cap(quantity, maximum, minimum=None, rollover=False):
 def caprot(rotation, maximum=360, minimum=0):
     return cap(rotation, maximum, minimum, True)
 
-def cappos(position, maximum=game.SCREEN_VECTOR):
+def cappos(position, maximum=None):
+    if maximum is None:
+        maximum = pygame.math.Vector2( game.width(), game.height() )
+
     return pygame.math.Vector2(
-        cap(position.x, game.SCREEN_WIDTH, 0, True),
-        cap(position.y, game.SCREEN_HEIGHT, 0, True)
+        cap(position.x, game.width(), 0, True),
+        cap(position.y, game.height(), 0, True)
     )
 
 class Entity:
     """Interface for all Space Dodge game objects."""
 
-    isdead = False
-    gamechildren = []
-    physchildren = []
+    _isdead = False
+    _isphysical = False
+    _children = []
 
     def update(self):
         raise NotImplementedError(
@@ -62,6 +67,18 @@ class Entity:
         raise NotImplementedError(
             "Class %s doesn't implement interact()" % self.__class__.__name__
         )
+
+    def children(self):
+        return self._children
+
+    def infanticide(self):
+        self._children = []
+
+    def isdead(self):
+        return self._isdead
+
+    def isphysical(self):
+        return self._isphysical
 
 class Star(Entity):
     COLORS = [WHITE, LIGHTGREY, GREY, DARKGREY, BLACK, WHITE]
@@ -96,7 +113,7 @@ class Star(Entity):
             if self.color != self.COLORS[self.index]:
                 self.color = self.COLORS[self.index]
                 if self.index == len(self.COLORS) - 1:
-                    self.gamechildren = [ SpaceHole(self) ]
+                    self._children = [ SpaceHole(self) ]
 
 class SpaceHole(Entity):
     MAX_RADIUS = 30
@@ -135,7 +152,7 @@ class SpaceHole(Entity):
                     * UNIT_VECTOR.rotate(game.randangle())
             )
         else:
-            self.isdead = True
+            self._isdead = True
 
     def _raylonger(self):
         for t in self.TRANSITIONS:
@@ -154,8 +171,8 @@ class SpaceHole(Entity):
         self.rot += self.rotvel
 
         if self.radius >= self.MAX_RADIUS:
-            self.isdead = True
-            self.physchildren = [ self.child ]
+            self._isdead = True
+            self._children = [ self.child ]
 
     def lines(self):
         retval = []
@@ -175,11 +192,12 @@ class SpaceHole(Entity):
 
 class Asteroid(Entity):
     MIN_RADIUS = 6
+    _isphysical = True
     def __init__(self, pos, vel, radius=None):
         self.pos = pygame.math.Vector2(pos)
         self.vel = pygame.math.Vector2(vel)
         self.color = WHITE
-        if radius == None:
+        if radius is None:
             self.radius = random.randint(self.MIN_RADIUS, 30)
         else:
             self.radius = radius
@@ -215,20 +233,16 @@ class Asteroid(Entity):
         # wrap screen
         self.pos = cappos(self.pos)
 
-    def interact(self, other, recurse=True):
-        if isinstance(other, Asteroid):
-            return
-
-        self.destroy()
-        if recurse:
-            other.interact(self, False)
+    def interact(self, other):
+        if not isinstance(other, Asteroid):
+            self.destroy()
 
     def destroy(self):
-        self.isdead = True
-        self.gamechildren = Debris.scrap(self)
+        self._isdead = True
+        self._children = Debris.scrap(self)
         if self.radius >= 2*self.MIN_RADIUS:
             for i in range(2):
-                self.physchildren = [ self._birth() for i in range(2) ]
+                self._children = [ self._birth() for i in range(2) ]
 
     def _birth(self):
         v = pygame.math.Vector2(self.vel)
@@ -242,6 +256,7 @@ class Ship(Entity):
     MIN_VEL = 0.05
     MAX_ACCEL = 0.08
     MAX_ROTVEL = 2.0
+    _isphysical = True
 
     def __init__(self, pos, vel, rot):
         self.pos = pygame.math.Vector2(pos)
@@ -298,14 +313,12 @@ class Ship(Entity):
         # wrap screen
         self.pos = cappos(self.pos)
 
-    def interact(self, other, recurse=True):
+    def interact(self, other):
         self.destroy()
-        if recurse:
-            other.interact(self, False)
 
     def destroy(self):
-        self.isdead = True
-        self.gamechildren = Debris.scrap(self)
+        self._isdead = True
+        self._children = Debris.scrap(self)
 
 class Debris(Entity):
     BASE_ROTVEL = 5
@@ -352,7 +365,7 @@ class Debris(Entity):
 
         # wrap screen
         if self.pos != cappos(self.pos):
-            self.isdead = True
+            self._isdead = True
 
     def points(self):
         return [ self.pos + end for end in self.ends ]
@@ -398,16 +411,19 @@ class EnemyShip(Ship):
 class PlayerShip(Ship):
 
     def __init__(self,
-        pos=(game.SCREEN_WIDTH / 2.0, game.SCREEN_HEIGHT / 2.0),
+        pos=None,
         vel=(0.0, 0.0),
         rot=0.0
     ):
+        if pos is None:
+            pos = (game.width() / 2.0, game.height() / 2.0)
+
         super(PlayerShip, self).__init__(pos, vel, rot)
         self.color = PINK
 
     def destroy(self):
         super().destroy()
-        self.pos = pygame.math.Vector2(game.SCREEN_WIDTH / 2.0, game.SCREEN_HEIGHT / 2.0)
+        self.pos = pygame.math.Vector2(game.width() / 2.0, game.height() / 2.0)
 
     def handle(self, event):
         if event.type == pygame.KEYDOWN:

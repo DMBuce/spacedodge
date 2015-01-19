@@ -1,138 +1,123 @@
 #!/usr/bin/python
 
 import pygame
-import sys
-import math
 import random
 
 import entity
 
-# colors
-BLACK     = (  0,   0,   0)
-DARKGREY  = (191, 191, 191)
-GREY      = (127, 127, 127)
-LIGHTGREY = ( 63,  63,  63)
-WHITE     = (255, 255, 255)
-PINK      = (255,  20, 147)
-YELLOW    = (255, 255,   0)
-
-#PI          = math.pi
-
-SCREEN_WIDTH  = 1280
-SCREEN_HEIGHT = 720
-#SCREEN_WIDTH  = 700
-#SCREEN_HEIGHT = 500
-SCREEN_VECTOR = pygame.math.Vector2(SCREEN_WIDTH, SCREEN_HEIGHT)
-
-global GAME_OBJECTS
-global PHYS_OBJECTS
-GAME_OBJECTS = []
-PHYS_OBJECTS = []
-PHYS_LIMIT = 20
-
-(x, y) = (0, 1)
+# TODO: move rand helper functions to entities module
 
 def randpos():
     return (
-        random.randint(0, SCREEN_WIDTH),
-        random.randint(0, SCREEN_HEIGHT)
+        random.randint(0, width()),
+        random.randint(0, height())
     )
 
 def randangle():
     return random.randint(0, 360)
 
-def main():
-    global GAME_OBJECTS
-    global PHYS_OBJECTS
+def width():
+    return pygame.display.get_surface().get_width()
 
-    random.seed()
+def height():
+    return pygame.display.get_surface().get_height()
 
-    pygame.display.init()
-    #pygame.draw.init()
-    #pygame.event.init()
-    #pygame.math.init()
-    #pygame.time.init()
 
-    winsize = (SCREEN_WIDTH, SCREEN_HEIGHT)
-    pygame.display.set_caption("SpaceDodge")
-    screen = pygame.display.set_mode(winsize)
+class Game:
+    # use width() and height() instead
+    #width()  = 1280
+    #height() = 720
+    PHYS_LIMIT = 20
 
-    clock = pygame.time.Clock()
+    def __init__(self):
 
-    # add the player
-    player = entity.PlayerShip()
-    GAME_OBJECTS.append(player)
-    PHYS_OBJECTS.append(player)
+        #pygame.draw.init()
+        #pygame.event.init()
+        #pygame.math.init()
+        #pygame.time.init()
+        pygame.display.init()
+        pygame.display.set_caption("SpaceDodge")
+        random.seed()
 
-    # add some stars
-    for i in range(SCREEN_WIDTH * SCREEN_HEIGHT // 700):
-        GAME_OBJECTS.append(entity.Star(None, player))
+        # TODO: pick dimensions from environment or args
+        self.screen = pygame.display.set_mode(
+            (1280, 720)
+        )
 
-    done = False
-    while not done:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                done = True
-            elif event.type == pygame.KEYDOWN or event.type == pygame.KEYUP:
-                player.handle(event)
+        self.clock = pygame.time.Clock()
+        self.entities = []
 
-        # GAME LOGIC
+        # add the player
+        self.player = entity.PlayerShip()
+        self.entities.append(self.player)
 
-        # update each game object
-        gamegrave = []
-        gamenursery = []
-        physnursery = []
-        for i, thing in enumerate(GAME_OBJECTS):
-            gamenursery += thing.gamechildren
-            physnursery += thing.physchildren
-            thing.gamechildren = []
-            thing.physchildren = []
+        # add some stars
+        for i in range(width() * height() // 700):
+            self.entities.append(entity.Star(None, self.player))
 
-            if thing.isdead:
-                gamegrave.append(i)
+    def run(self):
+        done = False
+        while not done:
+
+            # handle input
+            # TODO: split out into input component somehow
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    done = True
+                elif event.type == pygame.KEYDOWN or event.type == pygame.KEYUP:
+                    self.player.handle(event)
+
+            # GAME LOGIC
+
+            # gather up dead and newborn entities
+            # and update all living entities
+            grave = []        # indexes to dead entities that need to be reaped
+            nursery = []      # new entities that need to be added
+            physentities = [] # entities with physics
+            for i, thing in enumerate(self.entities):
+                nursery += thing.children()
+                thing.infanticide()
+
+                if thing.isdead():
+                    grave.append(i)
+                else:
+                    thing.update()
+
+            # check for collisions
+            physentities = [ e for e in self.entities if e.isphysical() ]
+            for i, thing in enumerate(physentities):
+                for j, that in enumerate(physentities[i+1:]):
+                    if not that.isdead() and thing.touches(that):
+                        thing.interact(that)
+                        that.interact(thing)
+
+            # reap dead entities
+            for i in reversed(grave):
+                self.entities.pop(i)
+
+            # add new entities
+            self.entities += nursery
+
+            # prevent asteroids from spawning if we're above PHYS_LIMIT
+            # TODO: move this logic into SpaceHole class
+            if len(physentities) > self.PHYS_LIMIT:
+                entity.SpaceHole.makeboth = False
             else:
-                thing.update()
+                entity.SpaceHole.makeboth = True
 
-        # check for collisions
-        physgrave = []
-        for i, thing in enumerate(PHYS_OBJECTS):
-            if thing.isdead:
-                physgrave.append(i)
-            for j, that in enumerate(PHYS_OBJECTS[i+1:]):
-                if not that.isdead and thing.touches(that):
-                    thing.interact(that)
+            # DRAW SCREEN
 
-        # reap dead objects
-        for i in reversed(gamegrave):
-            GAME_OBJECTS.pop(i)
+            self.screen.fill(entity.BLACK)
 
-        for i in reversed(physgrave):
-            PHYS_OBJECTS.pop(i)
+            for thing in self.entities:
+                thing.draw(self.screen)
 
-        # add new objects
-        GAME_OBJECTS += physnursery + gamenursery
-        PHYS_OBJECTS += physnursery
+            pygame.display.flip()
 
-        # prevent asteroids from spawning if we're above PHYS_LIMIT
-        if len(PHYS_OBJECTS) > PHYS_LIMIT:
-            entity.SpaceHole.makeboth = False
-        else:
-            entity.SpaceHole.makeboth = True
+            self.clock.tick(60)
 
-        # DRAW SCREEN
+        print(len(physentities))
 
-        screen.fill(BLACK)
-
-        for thing in GAME_OBJECTS:
-            thing.draw(screen)
-
-        pygame.display.flip()
-
-        clock.tick(60)
-
-    print(len(PHYS_OBJECTS))
-    pygame.quit()
-
-if __name__ == "__main__":
-    sys.exit(main())
+    def quit(self):
+        pygame.quit()
 
