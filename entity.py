@@ -185,12 +185,13 @@ class SpaceHole(Entity):
             pygame.draw.polygon(screen, self.color, points, 1)
 
 class Asteroid(Entity):
+    MIN_RADIUS = 6
     def __init__(self, pos, vel, radius=None):
         self.pos = pygame.math.Vector2(pos)
         self.vel = pygame.math.Vector2(vel)
         self.color = WHITE
         if radius == None:
-            self.radius = random.randint(2, 30)
+            self.radius = random.randint(self.MIN_RADIUS, 30)
         else:
             self.radius = radius
 
@@ -236,7 +237,7 @@ class Asteroid(Entity):
     def destroy(self):
         self.isdead = True
         self.gamechildren = Debris.scrap(self)
-        if self.radius >= 4:
+        if self.radius >= 2*self.MIN_RADIUS:
             for i in range(2):
                 self.physchildren = [ self._birth() for i in range(2) ]
 
