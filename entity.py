@@ -100,7 +100,6 @@ class Star(Entity):
 
 class SpaceHole(Entity):
     MAX_RADIUS = 30
-    #MAX_RAYLENGTH = 3
     TRANSITIONS = [ 1.0/3.0, 2.0/3.0, 5.0/6.0 ]
     NUMRAYS = 8
     RADVEL = 1.0 / 3.0
@@ -146,19 +145,10 @@ class SpaceHole(Entity):
 
         return False
 
-        #if self.MAX_RADIUS * 2.0/3 + self.RADVEL > self.radius >= self.MAX_RADIUS * 2.0/3:
-        #elif self.MAX_RADIUS * 5.0/6 + self.RADVEL > self.radius >= self.MAX_RADIUS * 5.0/6:
-
     def update(self):
         self.radius += self.RADVEL
         if self._raylonger():
             self.raylength += 1
-
-        #if self.MAX_RADIUS * 2.0/3 + self.RADVEL > self.radius >= self.MAX_RADIUS * 2.0/3:
-        ##if self.radius % 3 == 0 and self.raylength < self.MAX_RAYLENGTH:
-        #    self.raylength += 1
-        #elif self.MAX_RADIUS * 5.0/6 + self.RADVEL > self.radius >= self.MAX_RADIUS * 5.0/6:
-        #    self.raylength += 1
 
         self.rotvel += self.ROTACC
         self.rot += self.rotvel
@@ -181,7 +171,6 @@ class SpaceHole(Entity):
 
     def draw(self, screen):
         for points in self.lines():
-            #self.rect =
             pygame.draw.polygon(screen, self.color, points, 1)
 
 class Asteroid(Entity):
@@ -339,8 +328,6 @@ class Debris(Entity):
 
         self.rotvel = self.BASE_ROTVEL + random.randint(-2, 2)
         self.color = ship.color
-
-        #print("%s %s %s" % (self.pos, ship.pos, self.points()) )
 
     # factory method for making a pile of debris from an object
     def scrap(entity):
