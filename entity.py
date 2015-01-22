@@ -146,6 +146,15 @@ class SpaceHole(Entity):
                 0.5 * EnemyShip.MAX_VEL*UNIT_VECTOR.rotate(game.randangle()),
                 game.randangle()
             )
+
+            # mutate enemies
+            if diceroll <= 0.005:
+                enemy.MAX_VEL += random.uniform(0.0, 1.0)
+            elif 0.005 < diceroll <= 0.010:
+                enemy.MAX_ROTVEL += random.uniform(0.0, 1.0)
+            elif 0.010 < diceroll <= 0.015:
+                enemy.shielding += 1
+
             return enemy
         elif self.makeboth:
             return Asteroid(
@@ -258,7 +267,7 @@ class Ship(Entity):
     MIN_VEL = 0.05
     MAX_ACCEL = 0.08
     MAX_ROTVEL = 2.0
-    SHIELDCORNERS = 8
+    SHIELDCORNERS = 12
     MIN_SHIELDRADIUS = 7
     MAX_SHIELDING = 4
     _isphysical = True
@@ -293,7 +302,7 @@ class Ship(Entity):
         retval = []
         for i in range(num):
             corner = UNIT_VECTOR.rotate(22.5 + i * 360.0 / num)
-            corner.scale_to_length(self.MIN_SHIELDRADIUS + n*3)
+            corner.scale_to_length(self.MIN_SHIELDRADIUS + 1.5*n)
             retval.append(self.pos + corner)
 
         return retval
@@ -301,7 +310,8 @@ class Ship(Entity):
     def draw(self, screen):
         self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
         for i in range(self.shielding):
-            self.rect = pygame.draw.polygon(screen, self.color, self.shieldpoints(i), 1)
+            if i % 3 == (self.shielding - 1) % 3:
+                self.rect = pygame.draw.polygon(screen, self.color, self.shieldpoints(i), 1)
 
     def accelerate(self, accel):
         self.accel += accel
