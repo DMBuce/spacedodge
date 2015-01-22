@@ -24,7 +24,7 @@ def height():
 
 
 class Game:
-    PHYS_LIMIT = 20
+    PHYS_LIMIT = 30
 
     def __init__(self):
         entity.init(self)
@@ -50,7 +50,6 @@ class Game:
 
         # add the player
         self._player = entity.PlayerShip()
-        self._player.shielding += 1
         self.entities.append(self._player)
 
     def player(self, newplayer=None):

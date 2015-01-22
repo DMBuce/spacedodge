@@ -242,12 +242,13 @@ class Asteroid(Entity):
         self._isdead = True
         self._children = Debris.scrap(self)
         if self.radius >= 2*self.MIN_RADIUS:
-            for i in range(2):
-                self._children = [ self._birth() for i in range(2) ]
+            dv = random.uniform(0.0, 1.0) * UNIT_VECTOR.rotate(game.randangle())
+            self._children += [ self._birth(i*dv) for i in [-1, 1] ]
 
-    def _birth(self):
+    def _birth(self, dv):
         v = pygame.math.Vector2(self.vel)
-        v += 0.1*v.length() * UNIT_VECTOR.rotate(game.randangle())
+        v += 0.3*v.length() * UNIT_VECTOR.rotate(game.randangle())
+        v += dv
         return Asteroid(self.pos, v, self.radius // 2)
 
 class Ship(Entity):
@@ -258,7 +259,8 @@ class Ship(Entity):
     MAX_ACCEL = 0.08
     MAX_ROTVEL = 2.0
     SHIELDCORNERS = 8
-    MIN_SHIELDRADIUS = 10
+    MIN_SHIELDRADIUS = 7
+    MAX_SHIELDING = 4
     _isphysical = True
 
     def __init__(self, pos, vel, rot):
@@ -330,9 +332,12 @@ class Ship(Entity):
 
     def interact(self, other):
         if isinstance(other, Debris):
-            self.shielding += 1
+            self.shielding = cap(self.shielding + 1, self.MAX_SHIELDING, 0)
         elif self.shielding:
-            self.shielding -= 1
+            #self.shielding = cap(self.shielding - 3, self.MAX_SHIELDING, 0)
+            self.shielding -= 3
+            if self.shielding < 0:
+                self.shielding = 0
         else:
             self.destroy()
 
