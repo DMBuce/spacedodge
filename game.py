@@ -24,13 +24,10 @@ def height():
 
 
 class Game:
-    # use width() and height() instead
-    #width()  = 1280
-    #height() = 720
     PHYS_LIMIT = 20
 
     def __init__(self):
-
+        entity.init(self)
         #pygame.draw.init()
         #pygame.event.init()
         #pygame.math.init()
@@ -39,7 +36,7 @@ class Game:
         pygame.display.set_caption("SpaceDodge")
         random.seed()
 
-        # TODO: pick dimensions from environment or args
+        # TODO: pick dimensions from environment or config or args
         self.screen = pygame.display.set_mode(
             (1280, 720)
         )
@@ -47,13 +44,19 @@ class Game:
         self.clock = pygame.time.Clock()
         self.entities = []
 
-        # add the player
-        self.player = entity.PlayerShip()
-        self.entities.append(self.player)
-
         # add some stars
         for i in range(width() * height() // 700):
-            self.entities.append(entity.Star(None, self.player))
+            self.entities.append(entity.Star(None))
+
+        # add the player
+        self._player = entity.PlayerShip()
+        self.entities.append(self._player)
+
+    def player(self, newplayer=None):
+        if newplayer is not None:
+            self._player = newplayer
+
+        return self._player
 
     def run(self):
         done = False
@@ -65,7 +68,7 @@ class Game:
                 if event.type == pygame.QUIT:
                     done = True
                 elif event.type == pygame.KEYDOWN or event.type == pygame.KEYUP:
-                    self.player.handle(event)
+                    self._player.handle(event)
 
             # GAME LOGIC
 
@@ -75,8 +78,7 @@ class Game:
             nursery = []      # new entities that need to be added
             physentities = [] # entities with physics
             for i, thing in enumerate(self.entities):
-                nursery += thing.children()
-                thing.infanticide()
+                nursery += thing.poop()
 
                 if thing.isdead():
                     grave.append(i)
@@ -84,10 +86,10 @@ class Game:
                     thing.update()
 
             # check for collisions
-            physentities = [ e for e in self.entities if e.isphysical() ]
+            physentities = [ e for e in self.entities if e.isphysical() and not e.isdead() ]
             for i, thing in enumerate(physentities):
                 for j, that in enumerate(physentities[i+1:]):
-                    if not that.isdead() and thing.touches(that):
+                    if thing.touches(that):
                         thing.interact(that)
                         that.interact(thing)
 
@@ -121,3 +123,4 @@ class Game:
     def quit(self):
         pygame.quit()
 
+# vim: set expandtab shiftwidth=4 softtabstop=4:

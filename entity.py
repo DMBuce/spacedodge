@@ -40,12 +40,19 @@ def cappos(position, maximum=None):
         cap(position.y, game.height(), 0, True)
     )
 
+def init(game):
+    Entity._game = game
+
+def getgame():
+    return Entity._game
+
 class Entity:
     """Interface for all Space Dodge game objects."""
 
     _isdead = False
     _isphysical = False
     _children = []
+    rect = None
 
     def update(self):
         raise NotImplementedError(
@@ -71,8 +78,10 @@ class Entity:
     def children(self):
         return self._children
 
-    def infanticide(self):
+    def poop(self):
+        retval = self._children
         self._children = []
+        return retval
 
     def isdead(self):
         return self._isdead
@@ -84,16 +93,11 @@ class Star(Entity):
     COLORS = [WHITE, LIGHTGREY, GREY, DARKGREY, BLACK, WHITE]
     MAX_COUNT = 3000 # max length of time before a star changes colors: 50s
 
-    def __init__(self, pos=None, player=None):
+    def __init__(self, pos=None):
         if pos is None:
             self.pos = pygame.math.Vector2(game.randpos())
         else:
             self.pos = pygame.math.Vector2(pos)
-
-        if player is None:
-            self.goal = self
-        else:
-            self.goal = player
 
         self.index = random.randint(0, len(self.COLORS) - 1)
         self.color = self.COLORS[self.index]
@@ -125,7 +129,6 @@ class SpaceHole(Entity):
 
     def __init__(self, star):
         self.pos = star.pos
-        self.goal = star.goal
         self.child = self._birth()
         self.radius = 0.0
         self.raylength = 0
@@ -143,7 +146,6 @@ class SpaceHole(Entity):
                 0.5 * EnemyShip.MAX_VEL*UNIT_VECTOR.rotate(game.randangle()),
                 game.randangle()
             )
-            enemy.target(self.goal)
             return enemy
         elif self.makeboth:
             return Asteroid(
@@ -204,7 +206,6 @@ class Asteroid(Entity):
 
         self.corners = self._mkcorners()
         self.rect = None
-        self.lastcolor = self.color
 
     def _mkcorners(self):
         num = random.randint(6, 9)
@@ -234,7 +235,7 @@ class Asteroid(Entity):
         self.pos = cappos(self.pos)
 
     def interact(self, other):
-        if not isinstance(other, Asteroid):
+        if isinstance(other, Ship):
             self.destroy()
 
     def destroy(self):
@@ -266,7 +267,6 @@ class Ship(Entity):
         self.rotvel = 0.0
         self.color = YELLOW
         self.rect = None
-        self.lastcolor = self.color
 
     def points(self):
         return [
@@ -379,7 +379,6 @@ class EnemyShip(Ship):
         super(EnemyShip, self).__init__(pos, vel, rot)
         self.count = 120 # 2 seconds
         self.update = self.cooldown
-        self.goal = self
 
     def cooldown(self):
         if self.count > 0:
@@ -390,11 +389,8 @@ class EnemyShip(Ship):
 
         super(EnemyShip, self).update()
 
-    def target(self, goal):
-        self.goal = goal
-
     def seek(self):
-        targetheading = self.goal.pos - self.pos
+        targetheading = getgame().player().pos - self.pos
         currentheading = self.vel
 
         crossproduct = currentheading.cross(targetheading)
@@ -445,3 +441,4 @@ class PlayerShip(Ship):
             elif event.key == pygame.K_DOWN:
                 self.accelerate(self.MAX_ACCEL)
 
+# vim: set expandtab shiftwidth=4 softtabstop=4:
