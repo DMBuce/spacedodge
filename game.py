@@ -50,6 +50,7 @@ class Game:
 
         # add the player
         self._player = entity.PlayerShip()
+        self._player.shielding += 1
         self.entities.append(self._player)
 
     def player(self, newplayer=None):

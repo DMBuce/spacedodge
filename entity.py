@@ -257,6 +257,8 @@ class Ship(Entity):
     MIN_VEL = 0.05
     MAX_ACCEL = 0.08
     MAX_ROTVEL = 2.0
+    SHIELDCORNERS = 8
+    MIN_SHIELDRADIUS = 10
     _isphysical = True
 
     def __init__(self, pos, vel, rot):
@@ -267,6 +269,7 @@ class Ship(Entity):
         self.rotvel = 0.0
         self.color = YELLOW
         self.rect = None
+        self.shielding = 0
 
     def points(self):
         return [
@@ -283,8 +286,20 @@ class Ship(Entity):
             ).rotate(self.rot)
         ]
 
+    def shieldpoints(self, n):
+        num = self.SHIELDCORNERS
+        retval = []
+        for i in range(num):
+            corner = UNIT_VECTOR.rotate(22.5 + i * 360.0 / num)
+            corner.scale_to_length(self.MIN_SHIELDRADIUS + n*3)
+            retval.append(self.pos + corner)
+
+        return retval
+
     def draw(self, screen):
         self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
+        for i in range(self.shielding):
+            self.rect = pygame.draw.polygon(screen, self.color, self.shieldpoints(i), 1)
 
     def accelerate(self, accel):
         self.accel += accel
@@ -314,7 +329,12 @@ class Ship(Entity):
         self.pos = cappos(self.pos)
 
     def interact(self, other):
-        self.destroy()
+        if isinstance(other, Debris):
+            self.shielding += 1
+        elif self.shielding:
+            self.shielding -= 1
+        else:
+            self.destroy()
 
     def destroy(self):
         self._isdead = True
@@ -325,6 +345,7 @@ class Debris(Entity):
     MIN_VEL = 0.5
 
     def __init__(self, ship, i, vel):
+        self._isphysical = True
         segments = ship.points()
         j = i+1
         if len(segments) == j:
@@ -372,6 +393,10 @@ class Debris(Entity):
 
     def draw(self, screen):
         self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
+
+    def interact(self, other):
+        if isinstance(other, Ship):
+            self._isdead = True
 
 class EnemyShip(Ship):
 
