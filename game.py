@@ -7,11 +7,19 @@ import entity
 
 # TODO: move rand helper functions to entities module
 
-def randpos():
-    return (
-        random.randint(0, width()),
-        random.randint(0, height())
-    )
+def randpos(edge=False):
+    randwidth  = random.randint(0, width())
+    randheight = random.randint(0, height())
+    if not edge:
+        print("not edge")
+        return (randwidth, randheight)
+    else:
+        return random.choice( [
+            ( randwidth, 0          ),
+            ( randwidth, height()   ),
+            ( 0,         randheight ),
+            ( width(),   randheight )
+        ] )
 
 def randangle():
     return random.randint(0, 360)
@@ -32,6 +40,7 @@ class Game:
         #pygame.event.init()
         #pygame.math.init()
         #pygame.time.init()
+        pygame.font.init()
         pygame.display.init()
         pygame.display.set_caption("SpaceDodge")
         random.seed()
@@ -55,6 +64,8 @@ class Game:
     def player(self, newplayer=None):
         if newplayer is not None:
             self._player = newplayer
+            if self._player not in self.entities:
+                self.entities.append(self._player)
 
         return self._player
 

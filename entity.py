@@ -12,6 +12,7 @@ LIGHTGREY = ( 63,  63,  63)
 WHITE     = (255, 255, 255)
 PINK      = (255,  20, 147)
 YELLOW    = (255, 255,   0)
+CYAN      = (  0, 255, 255)
 
 UNIT_VECTOR = pygame.math.Vector2(0, -1)
 
@@ -46,6 +47,7 @@ def init(game):
 def getgame():
     return Entity._game
 
+# TODO: simplify physics by removing some of: _isphysical, rect, touches(), interact()
 class Entity:
     """Interface for all Space Dodge game objects."""
 
@@ -91,26 +93,35 @@ class Entity:
 
 class Star(Entity):
     COLORS = [WHITE, LIGHTGREY, GREY, DARKGREY, BLACK, WHITE]
-    MAX_COUNT = 3000 # max length of time before a star changes colors: 50s
+    MAX_BLINKTIME = 3000 # max length of time before a star changes colors: 50s
 
-    def __init__(self, pos=None):
+    def __init__(self, pos=None, lifetime=-1):
         if pos is None:
+            print( game.randpos() )
             self.pos = pygame.math.Vector2(game.randpos())
         else:
             self.pos = pygame.math.Vector2(pos)
 
         self.index = random.randint(0, len(self.COLORS) - 1)
         self.color = self.COLORS[self.index]
-        self.count = random.randint(0, self.MAX_COUNT)
+        self.blinktime = random.randint(0, self.MAX_BLINKTIME)
+        self.lifetime = lifetime
 
     def draw(self, screen):
         pygame.draw.line(screen, self.color, self.pos, self.pos)
 
     def update(self):
-        if self.count != 0:
-            self.count -= 1
+        if self.lifetime == -1:
+            pass
+        elif self.lifetime == 0:
+            self._isdead = True
         else:
-            self.count = random.randint(0, self.MAX_COUNT)
+            self.lifetime -= 1
+
+        if self.blinktime != 0:
+            self.blinktime -= 1
+        else:
+            self.blinktime = random.randint(0, self.MAX_BLINKTIME)
 
             self.index += random.randint(-1, 1)
             self.index = cap(self.index, len(self.COLORS)-1)
@@ -118,6 +129,56 @@ class Star(Entity):
                 self.color = self.COLORS[self.index]
                 if self.index == len(self.COLORS) - 1:
                     self._children = [ SpaceHole(self) ]
+
+class ShootingStar(Entity):
+    MAX_VEL = 0.5
+    WIDTH  = 3
+    HEIGHT = 3
+    TRAILTIME = 1800 # 5 minutes
+    _num = 0
+
+    def __init__(self, color=CYAN):
+        ShootingStar._num += 1
+        self.color = color
+        self.pos = pygame.math.Vector2( game.randpos(edge=True) )
+        self.vel = pygame.math.Vector2( game.width()/2, game.height()/2 ) - self.pos
+        self.vel.scale_to_length(self.MAX_VEL)
+        self.rect = None
+        self._isphysical = True
+
+    def update(self):
+        self.pos += self.vel
+
+        # poop a trail of stars
+        if random.randint(0, 3) == 0:
+            dr = self.vel.rotate(90)
+            dr.scale_to_length(1)
+            dr *= random.uniform(-1, 1) * self.WIDTH
+            self._children.append(Star(self.pos + dr, self.TRAILTIME))
+
+        # leave screen
+        if self.pos != cappos(self.pos):
+            self._isdead = True
+
+    def number(self=None):
+        return ShootingStar._num
+
+    def points(self):
+        retval = []
+        for i in [ self.WIDTH/2, -self.WIDTH/2 ]:
+            for j in [ i, -i ]:
+                retval.append( pygame.math.Vector2(self.pos.x + i, self.pos.y + j) )
+
+        return retval
+
+    def draw(self, screen):
+        self.rect = pygame.draw.polygon(screen, self.color, self.points())
+
+    def interact(self, other):
+        if isinstance(other, Ship):
+            Ship.MAX_SHIELDING += 3
+            self._isdead = True
+            ShootingStar._num -= 1
 
 class SpaceHole(Entity):
     MAX_RADIUS = 30
@@ -267,9 +328,9 @@ class Ship(Entity):
     MIN_VEL = 0.05
     MAX_ACCEL = 0.08
     MAX_ROTVEL = 2.0
-    SHIELDCORNERS = 8
+    SHIELDCORNERS = 12
     MIN_SHIELDRADIUS = 7
-    MAX_SHIELDING = 16
+    MAX_SHIELDING = 1
     _isphysical = True
 
     def __init__(self, pos, vel, rot):
@@ -302,7 +363,6 @@ class Ship(Entity):
         retval = []
         for i in range(num):
             corner = UNIT_VECTOR.rotate(22.5 + i * 360.0 / num)
-            #corner = UNIT_VECTOR.rotate(i * 360.0 / num)
             corner.scale_to_length(self.MIN_SHIELDRADIUS + 1.5*n)
             retval.append(self.pos + corner)
 
@@ -344,6 +404,8 @@ class Ship(Entity):
     def interact(self, other):
         if isinstance(other, Debris):
             self.shielding = cap(self.shielding + 1, self.MAX_SHIELDING, 0)
+        elif isinstance(other, ShootingStar):
+            pass
         elif self.shielding:
             #self.shielding = cap(self.shielding - 3, self.MAX_SHIELDING, 0)
             self.shielding -= 3
@@ -400,7 +462,7 @@ class Debris(Entity):
         # update position
         self.pos += self.vel
 
-        # wrap screen
+        # leave screen
         if self.pos != cappos(self.pos):
             self._isdead = True
 
@@ -456,11 +518,28 @@ class PlayerShip(Ship):
             pos = (game.width() / 2.0, game.height() / 2.0)
 
         super(PlayerShip, self).__init__(pos, vel, rot)
+        self.lastshielding = self.shielding
         self.color = PINK
+
+    def update(self):
+        super().update()
+        if self.lastshielding != self.MAX_SHIELDING \
+        and self.shielding == self.MAX_SHIELDING \
+        and ShootingStar.number() == 0:
+            self._children.append(ShootingStar())
+
+        self.lastshielding = self.shielding
 
     def destroy(self):
         super().destroy()
         self.pos = pygame.math.Vector2(game.width() / 2.0, game.height() / 2.0)
+        self._children.append( RestartText(self) )
+
+    def reset(self):
+        self.__init__()
+        self._isdead = False
+        Ship.MAX_SHIELDING = 1
+        getgame().player(self)
 
     def handle(self, event):
         if event.type == pygame.KEYDOWN:
@@ -481,5 +560,25 @@ class PlayerShip(Ship):
                 self.accelerate(-self.MAX_ACCEL)
             elif event.key == pygame.K_DOWN:
                 self.accelerate(self.MAX_ACCEL)
+            elif event.key == pygame.K_SPACE and self.isdead():
+                self.reset()
+
+class RestartText(Entity):
+    def __init__(self, ship):
+        self.ship = ship
+        self.pos = ship.pos
+        self.drawn = False
+        self.image = pygame.image.load("continue.png")
+        self.imagerect = self.image.get_rect()
+        self.imagerect.center = self.pos
+
+    def update(self):
+        if not self.ship.isdead():
+            self._isdead = True
+
+    def draw(self, screen):
+        #text = self.font.render("Space to restart", True, ship.color)
+        screen.blit( self.image, self.imagerect )
+        self.drawn = True
 
 # vim: set expandtab shiftwidth=4 softtabstop=4:
