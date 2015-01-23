@@ -267,9 +267,9 @@ class Ship(Entity):
     MIN_VEL = 0.05
     MAX_ACCEL = 0.08
     MAX_ROTVEL = 2.0
-    SHIELDCORNERS = 12
+    SHIELDCORNERS = 8
     MIN_SHIELDRADIUS = 7
-    MAX_SHIELDING = 4
+    MAX_SHIELDING = 16
     _isphysical = True
 
     def __init__(self, pos, vel, rot):
@@ -302,6 +302,7 @@ class Ship(Entity):
         retval = []
         for i in range(num):
             corner = UNIT_VECTOR.rotate(22.5 + i * 360.0 / num)
+            #corner = UNIT_VECTOR.rotate(i * 360.0 / num)
             corner.scale_to_length(self.MIN_SHIELDRADIUS + 1.5*n)
             retval.append(self.pos + corner)
 
