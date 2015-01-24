@@ -159,6 +159,7 @@ class ShootingStar(Entity):
         # leave screen
         if self.pos != cappos(self.pos):
             self._isdead = True
+            ShootingStar._num -= 1
 
     def number(self=None):
         return ShootingStar._num
@@ -176,7 +177,7 @@ class ShootingStar(Entity):
 
     def interact(self, other):
         if isinstance(other, Ship):
-            Ship.MAX_SHIELDING += 3
+            Ship.MAX_SHIELDING += Ship.SHIELD_PER_SHIELDING
             self._isdead = True
             ShootingStar._num -= 1
 
@@ -331,6 +332,7 @@ class Ship(Entity):
     SHIELDCORNERS = 12
     MIN_SHIELDRADIUS = 7
     MAX_SHIELDING = 1
+    SHIELD_PER_SHIELDING = 4
     _isphysical = True
 
     def __init__(self, pos, vel, rot):
@@ -363,7 +365,7 @@ class Ship(Entity):
         retval = []
         for i in range(num):
             corner = UNIT_VECTOR.rotate(22.5 + i * 360.0 / num)
-            corner.scale_to_length(self.MIN_SHIELDRADIUS + 1.5*n)
+            corner.scale_to_length(self.MIN_SHIELDRADIUS + 4.5*n/self.SHIELD_PER_SHIELDING)
             retval.append(self.pos + corner)
 
         return retval
@@ -371,7 +373,7 @@ class Ship(Entity):
     def draw(self, screen):
         self.rect = pygame.draw.polygon(screen, self.color, self.points(), 1)
         for i in range(self.shielding):
-            if i % 3 == (self.shielding - 1) % 3:
+            if i % self.SHIELD_PER_SHIELDING == (self.shielding - 1) % self.SHIELD_PER_SHIELDING:
                 self.rect = pygame.draw.polygon(screen, self.color, self.shieldpoints(i), 1)
 
     def accelerate(self, accel):
@@ -408,7 +410,7 @@ class Ship(Entity):
             pass
         elif self.shielding:
             #self.shielding = cap(self.shielding - 3, self.MAX_SHIELDING, 0)
-            self.shielding -= 3
+            self.shielding -= self.SHIELD_PER_SHIELDING
             if self.shielding < 0:
                 self.shielding = 0
         else:
@@ -543,22 +545,22 @@ class PlayerShip(Ship):
 
     def handle(self, event):
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RIGHT:
+            if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                 self.rotate(self.MAX_ROTVEL)
-            elif event.key == pygame.K_LEFT:
+            elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
                 self.rotate(-self.MAX_ROTVEL)
-            elif event.key == pygame.K_UP:
+            elif event.key == pygame.K_UP or event.key == pygame.K_w:
                 self.accelerate(self.MAX_ACCEL)
-            elif event.key == pygame.K_DOWN:
+            elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                 self.accelerate(-self.MAX_ACCEL)
         elif event.type == pygame.KEYUP:
-            if event.key == pygame.K_RIGHT:
+            if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                 self.rotate(-self.MAX_ROTVEL)
-            elif event.key == pygame.K_LEFT:
+            elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
                 self.rotate(self.MAX_ROTVEL)
-            elif event.key == pygame.K_UP:
+            elif event.key == pygame.K_UP or event.key == pygame.K_w:
                 self.accelerate(-self.MAX_ACCEL)
-            elif event.key == pygame.K_DOWN:
+            elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                 self.accelerate(self.MAX_ACCEL)
             elif event.key == pygame.K_SPACE and self.isdead():
                 self.reset()
