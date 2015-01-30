@@ -573,7 +573,9 @@ class RestartText(Entity):
         self.ship = ship
         self.pos = ship.pos
         self.drawn = False
-        imgpath = os.path.join(os.path.dirname(__main__.__file__), "data", "continue.png")
+        modulepath = globals()['__file__']
+        imgpath = os.path.join(os.path.dirname(modulepath), "data", "continue.png")
+        #imgpath = os.path.join(os.path.dirname(__main__.__file__), "data", "continue.png")
         self.image = pygame.image.load(imgpath)
         self.imagerect = self.image.get_rect()
         self.imagerect.center = self.pos
