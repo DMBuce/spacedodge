@@ -42,7 +42,7 @@ class Game:
         #pygame.time.init()
         pygame.font.init()
         pygame.display.init()
-        pygame.display.set_caption("SpaceDodge")
+        pygame.display.set_caption("Liney Space")
         random.seed()
 
         # TODO: pick dimensions from environment or config or args

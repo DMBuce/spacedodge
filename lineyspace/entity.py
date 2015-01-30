@@ -1,6 +1,8 @@
 
 import pygame
 import random
+import os
+import __main__
 
 import game
 
@@ -49,7 +51,7 @@ def getgame():
 
 # TODO: simplify physics by removing some of: _isphysical, rect, touches(), interact()
 class Entity:
-    """Interface for all Space Dodge game objects."""
+    """Interface for all Liney Space game objects."""
 
     _isdead = False
     _isphysical = False
@@ -178,6 +180,7 @@ class ShootingStar(Entity):
     def interact(self, other):
         if isinstance(other, Ship):
             Ship.MAX_SHIELDING += Ship.SHIELD_PER_SHIELDING
+            other.shielding += Ship.SHIELD_PER_SHIELDING - 1
             self._isdead = True
             ShootingStar._num -= 1
 
@@ -570,7 +573,8 @@ class RestartText(Entity):
         self.ship = ship
         self.pos = ship.pos
         self.drawn = False
-        self.image = pygame.image.load("continue.png")
+        imgpath = os.path.join(os.path.dirname(__main__.__file__), "data", "continue.png")
+        self.image = pygame.image.load(imgpath)
         self.imagerect = self.image.get_rect()
         self.imagerect.center = self.pos
 
