@@ -13,7 +13,7 @@ pygame:
 	hg clone https://bitbucket.org/pygame/pygame
 
 env:
-	virtualenv env
+	virtualenv -p python3 env
 
 env/lib/python$(PYTHON_VERSION)/site-packages/pygame: env pygame
 	./env/bin/python pygame/setup.py install || exit 0
